@@ -16,7 +16,6 @@ SPLITS = ["train", "validation", "test", "stress"]
 
 
 def validate_dataset():
-
     counts = defaultdict(Counter)
     hashes = {}
     errors = []
