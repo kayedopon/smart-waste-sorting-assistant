@@ -16,7 +16,7 @@ EPOCHS = 20
 BATCH_SIZE = 32
 LEARNING_RATE = 0.001
 
-SEEDS = [42]
+SEEDS = [42, 123, 2026]
 
 MODEL_DIR = Path("models")
 MODEL_DIR.mkdir(exist_ok=True)

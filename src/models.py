@@ -1,6 +1,7 @@
 
 import torch
 from torch import nn
+from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights
 
 from src.dataset import CLASS_NAMES
 
@@ -56,27 +57,59 @@ class BaselineCNN(nn.Module):
 
         return x
 
-if __name__ == "__main__":
+def create_mobilenet():
 
-    device = torch.device(
-        "cuda" if torch.cuda.is_available() else "cpu"
+    model = mobilenet_v3_small(
+        weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1
     )
 
-    model = BaselineCNN().to(device)
+    # Replace ImageNet's 1000-class output with 7 waste classes
+    model.classifier[-1] = nn.Linear(
+        model.classifier[-1].in_features,
+        len(CLASS_NAMES),
+    )
 
-    # Simulate a batch of 4 RGB images
-    images = torch.randn(4, 3, 224, 224).to(device)
+    return model
+
+def configure_mobilenet(model, stage):
+
+    if stage not in ("frozen", "fine_tune"):
+        raise ValueError(f"Unknown training stage: {stage}")
+
+    # Freeze the complete feature extractor
+    for parameter in model.features.parameters():
+        parameter.requires_grad = False
+
+    # Train the complete classifier
+    for parameter in model.classifier.parameters():
+        parameter.requires_grad = True
+
+    # Fine-tuning: unfreeze the final three feature blocks
+    if stage == "fine_tune":
+        for layer in model.features[-3:]:
+            for parameter in layer.parameters():
+                parameter.requires_grad = True
+
+    return model
+
+if __name__ == "__main__":
+
+    model = create_mobilenet()
+
+    for stage in ("frozen", "fine_tune"):
+
+        configure_mobilenet(model, stage)
+
+        trainable = sum(
+            p.numel() for p in model.parameters()
+            if p.requires_grad
+        )
+
+        print(f"{stage}: {trainable:,} trainable parameters")
 
     model.eval()
 
     with torch.no_grad():
-        outputs = model(images)
+        output = model(torch.randn(1, 3, 224, 224))
 
-    parameters = sum(
-        p.numel() for p in model.parameters()
-    )
-
-    print(f"Device: {device}")
-    print(f"Parameters: {parameters:,}")
-    print(f"Input shape: {images.shape}")
-    print(f"Output shape: {outputs.shape}")
+    print(f"Output shape: {output.shape}")
